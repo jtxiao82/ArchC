@@ -102,6 +102,7 @@ char *OTHER_FLAGS;    //!<Miscellaneous flags to be passed to the compiler
 enum _ac_cmd_options {
   OPABI,
   OPNOABI,
+  OPFaultInjection,
   OPDebug,
 #if HLT_SUPPORT
   OPHLTrace,

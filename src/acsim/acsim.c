@@ -85,6 +85,7 @@ int  ACPCAddress=1;                             //!<Indicates if PC bounds is ve
 int  ACFullDecode=0;                            //!<Indicates if Full Decode Optimization is turned on or not
 int  ACCurInstrID=1;                            //!<Indicates if Current Instruction ID is save in dispatch
 int  ACPowerEnable=0;                           //!<Indicates if Power Estimation is enabled
+int  ACFaultInjection=0;                           //!<Indicates if CPU Fault Injection is enabled
 
 char ACOptions[500];                            //!<Stores ArchC recognized command line options
 char *ACOptions_p = ACOptions;                  //!<Pointer used to append options in ACOptions
@@ -119,6 +120,7 @@ ac_sto_list* load_device=0;
 struct option_map option_map[] = {
   {"--abi-included"    , "-abi","Indicate that an ABI for system call emulation was provided." ,"o"},
   {"--abi-not-included", "-noabi","Indicate that an ABI for system call emulation was NOT provided." ,"o"},
+  {"--fault-inject-included", "-fi", "Indicate that an FI for system fault injection", "o"},
   {"--debug"           , "-g"  ,"Enable simulation debug features: traces, update logs." ,"o"},
 #ifdef HLT_SUPPORT
   {"--high-level-trace", "-hlt","Enable generation of high level traces" ,"o"},
@@ -304,6 +306,9 @@ int main(int argc, char** argv) {
               ACABIFlag = 0;
               ACOptions_p += sprintf( ACOptions_p, "%s ", argv[0]);
               break;
+            case OPFaultInjection: // Modified by JT
+              ACFaultInjection = 1;
+              ACOptions_p += sprintf( ACOptions_p, "%s ", argv[0]);
             case OPDebug:
               ACDebugFlag = 1;
               ACOptions_p += sprintf( ACOptions_p, "%s ", argv[0]);
@@ -1609,6 +1614,8 @@ void CreateProcessorHeader() {
 
   // Modified by JT
   fprintf( output, "#include \"%s_type.H\"\n", project_name);
+  fprintf( output, "#include \"ac_fi.H\"\n");
+  
 
   // POWER ESTIMATION SUPPORT
 
@@ -1861,6 +1868,17 @@ if (HaveTLM2IntrPorts) {
     fprintf(output, "%svoid enable_gdb(int port = 0);\n\n", INDENT[1]);
 
   fprintf( output, "%svirtual ~%s() {};\n\n", INDENT[1], project_name);
+
+  // JT modifed
+  //if (ACFaultInjection) {
+    //fprintf( output, "%s#ifdef TRACE// Trace\n", INDENT[1]);
+    //fprintf( output, "%s%s_trace trace;\n", INDENT[1], project_name);
+    //fprintf( output, "%s#endif \n\n", INDENT[1]);
+    fprintf( output, "%s#ifdef INSTR_FI// Fault Injection-Bit flip\n", INDENT[1]);
+    fprintf( output, "%sac_fi<unsigned> fi;\n", INDENT[1]);
+    fprintf( output, "%s#endif \n\n", INDENT[1]);
+  
+  //}
 
   //!Closing class declaration.
   fprintf( output,"%s};\n", INDENT[0] );
@@ -3397,6 +3415,20 @@ void CreateMakefile(){
 
   fprintf( output, " %s", OTHER_FLAGS);
 
+  // Modified by JT
+  //if(ACFaultInjection) {
+    //fprintf( output, "\nifdef TRACE\n");
+    //fprintf( output, "OTHER  += -DTRACE\n");
+    //fprintf( output, "endif\n");
+
+    fprintf( output, "ifdef INSTR_FI\n");
+    fprintf( output, "OTHER  += -DINSTR_FI\n");
+    fprintf( output, "endif\n");
+    fprintf( output, "ifdef PC_FI\n");
+    fprintf( output, "OTHER  += -DPC_FI\n");
+    fprintf( output, "endif\n");
+  //}
+
   fprintf( output, "CFLAGS := $(DEBUG) $(OPT) $(OTHER) %s %s\n",
            (ACGDBIntegrationFlag) ? "-DUSE_GDB" : "",
            (ACPowerEnable) ? "-DPOWER_SIM=\\\"$(PWD)/powersc\\\"" : "");
@@ -4412,6 +4444,15 @@ void EmitDecCacheAt(FILE *output, int base_indent) {
   }
 
   fprintf(output, "%s}\n", INDENT[base_indent]);
+
+  // JT modified
+  //fprintf(output, "%s#ifdef TRACE\n", INDENT[base_indent + 1]);
+  //fprintf(output, "%strace.trace_func(instr_dec);\n", INDENT[base_indent + 1]);
+  //fprintf(output, "%s#endif\n", INDENT[base_indent + 1]);
+  fprintf(output, "%s#ifdef INSTR_FI\n", INDENT[base_indent + 1]);
+  fprintf(output, "%sfi.select_fi(instr_dec);\n", INDENT[base_indent + 1]);
+  fprintf(output, "%s#endif\n", INDENT[base_indent + 1]);
+
 }
 
 /**************************************/
