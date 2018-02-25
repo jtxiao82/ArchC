@@ -1614,8 +1614,13 @@ void CreateProcessorHeader() {
 
   // Modified by JT
   fprintf( output, "#include \"%s_type.H\"\n", project_name);
-  fprintf( output, "#include \"ac_fi.H\"\n");
-  
+  if(ACFaultInjection) {
+    fprintf( output, "#ifdef INSTR_TRACE\n");
+    fprintf( output, "#include \"ac_trace.H\"\n");
+    fprintf( output, "#endif\n");
+
+    fprintf( output, "#include \"ac_fi.H\"\n");
+  }
 
   // POWER ESTIMATION SUPPORT
 
@@ -1870,15 +1875,15 @@ if (HaveTLM2IntrPorts) {
   fprintf( output, "%svirtual ~%s() {};\n\n", INDENT[1], project_name);
 
   // JT modifed
-  //if (ACFaultInjection) {
-    //fprintf( output, "%s#ifdef TRACE// Trace\n", INDENT[1]);
-    //fprintf( output, "%s%s_trace trace;\n", INDENT[1], project_name);
-    //fprintf( output, "%s#endif \n\n", INDENT[1]);
+  if (ACFaultInjection) {
+    fprintf( output, "%s#ifdef INSTR_TRACE// Trace\n", INDENT[1]);
+    fprintf( output, "%sac_trace<unsigned> trace;\n", INDENT[1]);
+    fprintf( output, "%s#endif \n\n", INDENT[1]);
     fprintf( output, "%s#ifdef INSTR_FI// Fault Injection-Bit flip\n", INDENT[1]);
     fprintf( output, "%sac_fi<unsigned> fi;\n", INDENT[1]);
     fprintf( output, "%s#endif \n\n", INDENT[1]);
   
-  //}
+  }
 
   //!Closing class declaration.
   fprintf( output,"%s};\n", INDENT[0] );
@@ -3416,10 +3421,10 @@ void CreateMakefile(){
   fprintf( output, " %s", OTHER_FLAGS);
 
   // Modified by JT
-  //if(ACFaultInjection) {
-    //fprintf( output, "\nifdef TRACE\n");
-    //fprintf( output, "OTHER  += -DTRACE\n");
-    //fprintf( output, "endif\n");
+  if(ACFaultInjection) {
+    fprintf( output, "\nifdef INSTR_TRACE\n");
+    fprintf( output, "OTHER  += -DINSTR_TRACE\n");
+    fprintf( output, "endif\n");
 
     fprintf( output, "ifdef INSTR_FI\n");
     fprintf( output, "OTHER  += -DINSTR_FI\n");
@@ -3427,7 +3432,7 @@ void CreateMakefile(){
     fprintf( output, "ifdef PC_FI\n");
     fprintf( output, "OTHER  += -DPC_FI\n");
     fprintf( output, "endif\n");
-  //}
+  }
 
   fprintf( output, "CFLAGS := $(DEBUG) $(OPT) $(OTHER) %s %s\n",
            (ACGDBIntegrationFlag) ? "-DUSE_GDB" : "",
@@ -4446,12 +4451,14 @@ void EmitDecCacheAt(FILE *output, int base_indent) {
   fprintf(output, "%s}\n", INDENT[base_indent]);
 
   // JT modified
-  //fprintf(output, "%s#ifdef TRACE\n", INDENT[base_indent + 1]);
-  //fprintf(output, "%strace.trace_func(instr_dec);\n", INDENT[base_indent + 1]);
-  //fprintf(output, "%s#endif\n", INDENT[base_indent + 1]);
-  fprintf(output, "%s#ifdef INSTR_FI\n", INDENT[base_indent + 1]);
-  fprintf(output, "%sfi.select_fi(instr_dec);\n", INDENT[base_indent + 1]);
-  fprintf(output, "%s#endif\n", INDENT[base_indent + 1]);
+  if(ACFaultInjection) {
+    fprintf(output, "%s#ifdef INSTR_TRACE\n", INDENT[base_indent]);
+    fprintf(output, "%strace.trace_instr(instr_dec);\n", INDENT[base_indent]);
+    fprintf(output, "%s#endif\n", INDENT[base_indent]);
+    fprintf(output, "%s#ifdef INSTR_FI\n", INDENT[base_indent]);
+    fprintf(output, "%sfi.select_fi(instr_dec);\n", INDENT[base_indent]);
+    fprintf(output, "%s#endif\n", INDENT[base_indent]);
+  }
 
 }
 
