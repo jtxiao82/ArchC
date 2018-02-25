@@ -191,6 +191,7 @@ void CreateArchRefHeader(void);                   //!< Creates the header file f
 void CreateArchRefImpl(void);                     //!< Creates the .cpp file for proj_arch_ref class.
 void CreateISAHeader(void);                       //!< Creates the header file for the AC_ISA derived class.
 void CreateProcessorHeader(void);                 //!< Creates the header file for the processor module.
+void CreateProcessorInstructionHeader(void); //JT
 void CreateParmHeader(void);                      //!< Creates the header file for ArchC common parameters.
 void CreateRegsHeader(void);                      //!< Creates the header file for ArchC formatted registers.
 void CreateStatsHeaderTmpl(void);                 //!< Creates the header file for ArchC statistics collection class.
@@ -222,7 +223,7 @@ void EmitInstrExec(FILE *output, int base_indent);                              
 void EmitDecodification(FILE *output, int base_indent);                            //!< Emit for instruction decodification
 void EmitFetchInit(FILE *output, int base_indent);                                 //!< Emit code used for initializing fetchs
 void EmitCacheDeclaration(FILE *output, ac_sto_list* pstorage, int base_indent);   //!< Emit code for ac_cache object declaration
-void EmitDecCache(FILE *output, int base_indent);                                  //!< Emits a Decoder Cache Structure
+void EmitDecCache(FILE *output, int base_indent, char *project_name); // Modified by JT   
 void EmitDecCacheAt(FILE *output, int base_indent);                                //!< Emits a Decoder Cache Attribution
 void EmitDispatch(FILE *output, int base_indent);                                  //!< Emits the Dispatch Function used by Threading
 void EmitVetLabelAt(FILE *output, int base_indent);                                //!< Emits the Vector with Address of the Interpretation Routines used by Threading

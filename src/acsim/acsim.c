@@ -501,6 +501,7 @@ int main(int argc, char** argv) {
     AC_MSG("Warning: pipe_list is no more used by acsim.\n");
 
   //Creating Processor Files
+  CreateProcessorInstructionHeader();
   CreateProcessorHeader();
   CreateProcessorImpl();
 
@@ -1529,6 +1530,41 @@ void CreateISAHeader() {
   fclose( output);
 }
 
+// Modified JT
+void CreateProcessorInstructionHeader() {
+  extern char *project_name;
+  extern char *upper_project_name;
+  //extern int HaveTLMIntrPorts, largest_format_size;
+
+  //extern int HaveTLM2IntrPorts;
+  //extern ac_sto_list *tlm2_intr_port_list;
+
+  //extern ac_sto_list *tlm_intr_port_list;
+  //ac_sto_list *pport;
+  //extern ac_dec_instr *instr_list;
+  char filename[256];
+  char description[] = "Architecture Module header file.";
+
+  // File containing ISA declaration
+  FILE  *output;
+
+  sprintf( filename, "%s_type.H", project_name);
+
+  if ( !(output = fopen( filename, "w"))){
+    perror("ArchC could not open output file");
+    exit(1);
+  }
+
+  print_comment( output, description);
+
+  fprintf( output, "#ifndef  _%s_TYPE_H\n", upper_project_name);
+  fprintf( output, "#define  _%s_TYPE_H\n\n", upper_project_name);
+  fprintf( output, "#include <stdint.h>\n");
+
+  EmitDecCache(output, 1, project_name); // JT
+
+  fprintf( output, "#endif\n");
+}
 
 //!Creates Processor Module Header File
 void CreateProcessorHeader() {
@@ -1570,6 +1606,10 @@ void CreateProcessorHeader() {
   fprintf( output, "#include \"%s_arch.H\"\n", project_name);
   fprintf( output, "#include \"%s_isa.H\"\n", project_name);
 
+
+  // Modified by JT
+  fprintf( output, "#include \"%s_type.H\"\n", project_name);
+
   // POWER ESTIMATION SUPPORT
 
   if (ACPowerEnable) {
@@ -1605,9 +1645,11 @@ if (HaveTLM2IntrPorts) {
   fprintf(output, " {\n");
 
   fprintf(output, "private:\n");
-  if( ACDecCacheFlag ) {
+  
+  // Create DecCache in CreateProcessorHeader()
+  /*if( ACDecCacheFlag ) { 
     EmitDecCache(output, 1);
-  }
+  }*/
   if( ACWaitFlag ) {
     for(int temp=1; temp<=5; temp++) {
       for (ac_dec_instr *pinstr = instr_list; pinstr != NULL; pinstr = pinstr->next) {
@@ -1664,8 +1706,8 @@ if (HaveTLM2IntrPorts) {
   }
 
   if(ACDecCacheFlag){
-    fprintf( output, "%sDecCacheItem* DEC_CACHE;\n", INDENT[1]);
-    fprintf( output, "%sDecCacheItem* instr_dec;\n", INDENT[1]);
+    fprintf( output, "%s%s_type::DecCacheItem* DEC_CACHE;\n", INDENT[1], project_name);
+    fprintf( output, "%s%s_type::DecCacheItem* instr_dec;\n", INDENT[1], project_name);
   }
   else
     fprintf( output, "%sunsigned* ins_cache;\n", INDENT[1]);
@@ -1765,8 +1807,8 @@ if (HaveTLM2IntrPorts) {
 
   if(ACDecCacheFlag) {
     fprintf( output, "%svoid init_dec_cache() {\n", INDENT[1]);
-    fprintf( output, "%sDEC_CACHE = (DecCacheItem*) calloc(sizeof(DecCacheItem), (dec_cache_size",
-             INDENT[2]);
+    fprintf( output, "%sDEC_CACHE = (%s_type::DecCacheItem*) calloc(sizeof(%s_type::DecCacheItem), (dec_cache_size",
+             INDENT[2], project_name, project_name);
     if( ACIndexFix ) fprintf( output, " / %d", largest_format_size / 8);
     fprintf( output, "));\n");
     fprintf( output, "%s}\n\n", INDENT[1]);  //end init_dec_cache
@@ -4231,8 +4273,8 @@ void EmitCacheDeclaration( FILE *output, ac_sto_list* pstorage, int base_indent)
 /*!  Emits a Decoder Cache Structure.
   \brief Used by CreateProcessorHeader function */
 /***************************************/
-void EmitDecCache(FILE *output, int base_indent) {
-  extern ac_dec_format *format_ins_list;
+void EmitDecCache(FILE *output, int base_indent, char *project_name) {
+  /*extern ac_dec_format *format_ins_list;
 
   ac_dec_format *pformat;
   ac_dec_field *pfield;
@@ -4266,7 +4308,71 @@ void EmitDecCache(FILE *output, int base_indent) {
             pformat->name, pformat->name);
   }
   fprintf(output, "%s};\n", INDENT[base_indent + 1]);
+  fprintf(output, "%s} DecCacheItem ;\n\n", INDENT[base_indent]);*/
+
+  extern ac_dec_format *format_ins_list;
+
+  ac_dec_format *pformat;
+  ac_dec_field *pfield;
+
+  int max_ins_list = 0;
+  int max_pfield = 0, num_pfield = 0;
+
+  for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next) {
+    for (pfield = pformat->fields; pfield != NULL; pfield = pfield->next) {
+      fprintf(output, "#define ");
+      fprintf(output, "%s%s_%s_sz %d\n", INDENT[base_indent], pformat->name, pfield->name, pfield->size);
+      ++num_pfield;
+    }
+    fprintf(output, "#define ");
+    fprintf(output, "%s_Num %d\n", pformat->name, num_pfield); 
+    fprintf(output, "\n");
+    if(max_pfield <= num_pfield) max_pfield = num_pfield;
+    num_pfield = 0;
+    ++max_ins_list;
+  }
+
+  fprintf(output, "#define ");
+  fprintf(output, "%sinstr_num %d\n", INDENT[base_indent], max_ins_list);
+  fprintf(output, "#define ");
+  fprintf(output, "%smax_reg_num %d\n", INDENT[base_indent], max_pfield);
+
+  fprintf(output, "\nnamespace %s_type {\n", project_name);
+
+  for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next) {
+    fprintf(output, "%stypedef struct {\n", INDENT[base_indent]);
+    for (pfield = pformat->fields; pfield != NULL; pfield = pfield->next) {
+      fprintf(output, "%s", INDENT[base_indent + 1]);
+      if (!pfield->sign) fprintf(output, "u");
+
+      // Force to be int32_t
+      /*if (pfield->size < 9) fprintf(output, "int8_t");
+      else if (pfield->size < 17) fprintf(output, "int16_t");
+      else if (pfield->size < 33) fprintf(output, "int32_t");
+      else fprintf(output, "int64_t");*/
+      fprintf(output, "int32_t");
+
+      fprintf(output, " %s;\n", pfield->name);
+    }
+    fprintf(output, "%s} T_%s;\n\n", INDENT[base_indent], pformat->name);
+  }
+
+  fprintf(output, "%stypedef struct {\n", INDENT[base_indent]);
+  if( !ACFullDecode )
+    fprintf(output, "%sbool valid;\n", INDENT[base_indent + 1]);
+  if (ACThreading)
+    fprintf(output, "%svoid* end_rot;\n", INDENT[base_indent + 1]);
+  fprintf(output, "%sunsigned id;\n", INDENT[base_indent + 1]);
+
+  fprintf(output, "%sunion {\n", INDENT[base_indent + 1]);
+  for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next) {
+    fprintf(output, "%sT_%s F_%s;\n", INDENT[base_indent + 2],
+            pformat->name, pformat->name);
+  }
+  fprintf(output, "%s};\n", INDENT[base_indent + 1]);
   fprintf(output, "%s} DecCacheItem ;\n\n", INDENT[base_indent]);
+
+  fprintf(output, "}\n");
 }
 
 
