@@ -1616,7 +1616,7 @@ void CreateProcessorHeader() {
   fprintf( output, "#include \"%s_type.H\"\n", project_name);
   if(ACFaultInjection) {
     fprintf( output, "#ifdef INSTR_TRACE\n");
-    fprintf( output, "#include \"ac_trace.H\"\n");
+    fprintf( output, "#include \"ac_instr_trace.H\"\n");
     fprintf( output, "#endif\n");
 
     fprintf( output, "#include \"ac_fi.H\"\n");
@@ -1877,7 +1877,7 @@ if (HaveTLM2IntrPorts) {
   // JT modifed
   if (ACFaultInjection) {
     fprintf( output, "%s#ifdef INSTR_TRACE// Trace\n", INDENT[1]);
-    fprintf( output, "%sac_trace<unsigned> trace;\n", INDENT[1]);
+    fprintf( output, "%sac_instr_trace<unsigned> trace;\n", INDENT[1]);
     fprintf( output, "%s#endif \n\n", INDENT[1]);
     fprintf( output, "%s#ifdef INSTR_FI// Fault Injection-Bit flip\n", INDENT[1]);
     fprintf( output, "%sac_fi<unsigned> fi;\n", INDENT[1]);
@@ -3751,6 +3751,12 @@ void EmitDecodification( FILE *output, int base_indent) {
     if (ACThreading)
       fprintf( output, "%sinstr_dec->end_rot = IntRoutine[instr_dec->id];\n",
                INDENT[base_indent]);
+
+    if(ACFaultInjection) {
+      fprintf( output, "%s#ifdef INSTR_TRACE\n", INDENT[base_indent]);
+      fprintf( output, "%strace.trace_instr_format(ISA.instr_format_table[instr_dec->id]);\n", INDENT[base_indent]);
+      fprintf( output, "%s#endif \n", INDENT[base_indent]);
+    }
 
     EmitDecCacheAt( output, base_indent);
 
