@@ -45,7 +45,7 @@
 #include <systemc.h>
 
 #include "ac_log.H"
-#include "ac_fi.H"
+//#include "ac_fi.H"
 
 using std::string;
 using std::list;
@@ -70,9 +70,9 @@ protected:
   double& time_step;
 #endif 
 
-#ifdef PC_FI
-  ac_fi<T> fi;
-#endif
+//#ifdef PC_FI
+//  ac_fi<T> fi;
+//#endif
 
 public:
   
@@ -89,9 +89,9 @@ public:
     changes.push_back( chg_log(0, datum , sc_simulation_time()));
 #endif
 
-#ifdef PC_FI
-    fi.select_fi(1, &datum);
-#endif 
+//#ifdef PC_FI
+//    fi.select_fi(1, &datum);
+//#endif 
  
     Data = datum;
  
