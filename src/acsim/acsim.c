@@ -4920,8 +4920,10 @@ void TraceInstr(FILE *output) {
           fprintf(output, "%scerr << \"%s: \" << static_cast<int>(instr_dec->F_%s.%s) << setw(1);\n", INDENT[4], pfield->name, pformat->name, pfield->name);
         } else if(pfield_cnt != 0 && pfield_cnt != pfield_size-1) 
           fprintf(output, "%scerr << \", %s: \" << static_cast<int>(instr_dec->F_%s.%s) << setw(1);\n", INDENT[4], pfield->name, pformat->name, pfield->name);
-        else 
+        else {
+          fprintf(output, "%scerr << \", %s: \" << static_cast<int>(instr_dec->F_%s.%s) << setw(1);\n", INDENT[4], pfield->name, pformat->name, pfield->name);
           fprintf(output, "%scerr << endl;\n\n", INDENT[4]);
+        }
       }
 
       /*****************************
@@ -4934,9 +4936,9 @@ void TraceInstr(FILE *output) {
           fprintf(output, "%sbitset<%d> %s_%s(instr_dec->F_%s.%s);\n\n", INDENT[4], pfield->size, pformat->name, pfield->name, pformat->name, pfield->name);
       } 
 
-      /*****************************
+      /********************************
       Print the Register type name info
-      *****************************/
+      ********************************/
       for (pfield = pformat->fields, pfield_cnt = 0; pfield != NULL; pfield = pfield->next, ++pfield_cnt) {
         if(pfield_cnt != pfield_size-1) {
           fprintf(output, "%scerr << \"%s\" << setw(10); \n", INDENT[4], pfield->name);
@@ -4944,9 +4946,9 @@ void TraceInstr(FILE *output) {
           fprintf(output, "%scerr << \"%s\" << endl; \n\n", INDENT[4], pfield->name);
       }
 
-      /*****************************
+      /********************************
       Print the Register type name info
-      *****************************/
+      ********************************/
       for (pfield = pformat->fields, pfield_cnt = 0; pfield != NULL; pfield = pfield->next, ++pfield_cnt) {
         if(pfield_cnt != pfield_size-1) {
           fprintf(output, "%scerr << (%s_%s) << setw(10); \n", INDENT[4], pformat->name, pfield->name);
