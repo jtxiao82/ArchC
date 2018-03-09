@@ -224,7 +224,7 @@ void EmitInstrExec(FILE *output, int base_indent);                              
 void EmitDecodification(FILE *output, int base_indent);                            //!< Emit for instruction decodification
 void EmitFetchInit(FILE *output, int base_indent);                                 //!< Emit code used for initializing fetchs
 void EmitCacheDeclaration(FILE *output, ac_sto_list* pstorage, int base_indent);   //!< Emit code for ac_cache object declaration
-void EmitDecCache(FILE *output, int base_indent, char *project_name); // Modified by JT   
+void EmitDecCache(FILE *output, int base_indent);
 void EmitDecCacheAt(FILE *output, int base_indent);                                //!< Emits a Decoder Cache Attribution
 void EmitDispatch(FILE *output, int base_indent);                                  //!< Emits the Dispatch Function used by Threading
 void EmitVetLabelAt(FILE *output, int base_indent);                                //!< Emits the Vector with Address of the Interpretation Routines used by Threading
@@ -248,5 +248,12 @@ void GetFirstLevelDataDevice(void);
 
 //@}
 
+/**
+ *
+ * Trace CPU Utility Function
+ * @{
+ */
+void TraceInstr(FILE *ouput);
+//@}
 
 #endif /*_ACSIM_H_*/

@@ -120,7 +120,7 @@ ac_sto_list* load_device=0;
 struct option_map option_map[] = {
   {"--abi-included"    , "-abi","Indicate that an ABI for system call emulation was provided." ,"o"},
   {"--abi-not-included", "-noabi","Indicate that an ABI for system call emulation was NOT provided." ,"o"},
-  {"--fault-inject-included", "-fi", "Indicate that an FI for system fault injection", "o"},
+  {"--fault-inject-trace-included", "-fit", "Indicate that an FI for system fault injection", "o"},
   {"--debug"           , "-g"  ,"Enable simulation debug features: traces, update logs." ,"o"},
 #ifdef HLT_SUPPORT
   {"--high-level-trace", "-hlt","Enable generation of high level traces" ,"o"},
@@ -506,7 +506,6 @@ int main(int argc, char** argv) {
     AC_MSG("Warning: pipe_list is no more used by acsim.\n");
 
   //Creating Processor Files
-  CreateProcessorInstructionHeader();
   CreateProcessorHeader();
   CreateProcessorImpl();
 
@@ -1535,42 +1534,6 @@ void CreateISAHeader() {
   fclose( output);
 }
 
-// Modified JT
-void CreateProcessorInstructionHeader() {
-  extern char *project_name;
-  extern char *upper_project_name;
-  //extern int HaveTLMIntrPorts, largest_format_size;
-
-  //extern int HaveTLM2IntrPorts;
-  //extern ac_sto_list *tlm2_intr_port_list;
-
-  //extern ac_sto_list *tlm_intr_port_list;
-  //ac_sto_list *pport;
-  //extern ac_dec_instr *instr_list;
-  char filename[256];
-  char description[] = "Architecture Module header file.";
-
-  // File containing ISA declaration
-  FILE  *output;
-
-  sprintf( filename, "%s_type.H", project_name);
-
-  if ( !(output = fopen( filename, "w"))){
-    perror("ArchC could not open output file");
-    exit(1);
-  }
-
-  print_comment( output, description);
-
-  fprintf( output, "#ifndef  _%s_TYPE_H\n", upper_project_name);
-  fprintf( output, "#define  _%s_TYPE_H\n\n", upper_project_name);
-  fprintf( output, "#include <stdint.h>\n");
-
-  EmitDecCache(output, 1, project_name); // JT
-
-  fprintf( output, "#endif\n");
-}
-
 //!Creates Processor Module Header File
 void CreateProcessorHeader() {
   extern char *project_name;
@@ -1611,17 +1574,6 @@ void CreateProcessorHeader() {
   fprintf( output, "#include \"%s_arch.H\"\n", project_name);
   fprintf( output, "#include \"%s_isa.H\"\n", project_name);
 
-
-  // Modified by JT
-  fprintf( output, "#include \"%s_type.H\"\n", project_name);
-  if(ACFaultInjection) {
-    fprintf( output, "#ifdef INSTR_TRACE\n");
-    fprintf( output, "#include \"ac_trace.H\"\n");
-    fprintf( output, "#endif\n");
-
-    fprintf( output, "#include \"ac_fi.H\"\n");
-  }
-
   // POWER ESTIMATION SUPPORT
 
   if (ACPowerEnable) {
@@ -1629,7 +1581,6 @@ void CreateProcessorHeader() {
     fprintf( output, "#include \"arch_power_stats.H\"\n");
     fprintf( output, "#endif\n");
   }
-
 
   if (ACABIFlag)
     fprintf( output, "#include \"%s_syscall.H\"\n", project_name);
@@ -1649,6 +1600,15 @@ if (HaveTLM2IntrPorts) {
     fprintf( output, "#include \"ac_gdb.H\"\n");
   }
 
+  // Modified by JT
+  if(ACFaultInjection) {
+    //fprintf( output, "#include \"ac_fi.H\"\n");
+    fprintf( output, "#include <bitset>\n\n");
+    fprintf( output, "using std::bitset;\n");
+    fprintf( output, "using std::cerr;\n");
+    fprintf( output, "using std::endl;\n");
+  }
+
   fprintf(output, "\n\nclass %s: public ac_module, public %s_arch",
           project_name, project_name);
   if (ACGDBIntegrationFlag)
@@ -1659,9 +1619,9 @@ if (HaveTLM2IntrPorts) {
   fprintf(output, "private:\n");
   
   // Create DecCache in CreateProcessorHeader()
-  /*if( ACDecCacheFlag ) { 
+  if( ACDecCacheFlag ) { 
     EmitDecCache(output, 1);
-  }*/
+  }
   if( ACWaitFlag ) {
     for(int temp=1; temp<=5; temp++) {
       for (ac_dec_instr *pinstr = instr_list; pinstr != NULL; pinstr = pinstr->next) {
@@ -1718,8 +1678,8 @@ if (HaveTLM2IntrPorts) {
   }
 
   if(ACDecCacheFlag){
-    fprintf( output, "%s%s_type::DecCacheItem* DEC_CACHE;\n", INDENT[1], project_name);
-    fprintf( output, "%s%s_type::DecCacheItem* instr_dec;\n", INDENT[1], project_name);
+    fprintf( output, "%sDecCacheItem* DEC_CACHE;\n", INDENT[1]);
+    fprintf( output, "%sDecCacheItem* instr_dec;\n", INDENT[1]);
   }
   else
     fprintf( output, "%sunsigned* ins_cache;\n", INDENT[1]);
@@ -1769,7 +1729,10 @@ if (HaveTLM2IntrPorts) {
     fprintf( output, "\n#endif\n");
   }
 
-  else
+  else if(ACFaultInjection) {
+    fprintf( output, "%s%s( sc_module_name name_ ): ac_module(name_), %s_arch(), ISA(*this), instr_cnt(0)",
+            INDENT[1], project_name, project_name); 
+  } else
   {
     fprintf( output, "%s%s( sc_module_name name_ ): ac_module(name_), %s_arch(), ISA(*this)",
             INDENT[1], project_name, project_name);
@@ -1819,8 +1782,8 @@ if (HaveTLM2IntrPorts) {
 
   if(ACDecCacheFlag) {
     fprintf( output, "%svoid init_dec_cache() {\n", INDENT[1]);
-    fprintf( output, "%sDEC_CACHE = (%s_type::DecCacheItem*) calloc(sizeof(%s_type::DecCacheItem), (dec_cache_size",
-             INDENT[2], project_name, project_name);
+    fprintf( output, "%sDEC_CACHE = (DecCacheItem*) calloc(sizeof(DecCacheItem), (dec_cache_size",
+             INDENT[2]);
     if( ACIndexFix ) fprintf( output, " / %d", largest_format_size / 8);
     fprintf( output, "));\n");
     fprintf( output, "%s}\n\n", INDENT[1]);  //end init_dec_cache
@@ -1876,14 +1839,16 @@ if (HaveTLM2IntrPorts) {
 
   // JT modifed
   if (ACFaultInjection) {
-    fprintf( output, "%s#ifdef INSTR_TRACE// Trace\n", INDENT[1]);
+    /*fprintf( output, "%s#ifdef INSTR_TRACE// Trace\n", INDENT[1]);
     fprintf( output, "%sac_trace<unsigned> trace;\n", INDENT[1]);
-    fprintf( output, "%s#endif \n\n", INDENT[1]);
-    fprintf( output, "%s#ifdef INSTR_FI// Fault Injection-Bit flip\n", INDENT[1]);
-    fprintf( output, "%sac_fi<unsigned> fi;\n", INDENT[1]);
-    fprintf( output, "%s#endif \n\n", INDENT[1]);
+    fprintf( output, "%s#endif \n\n", INDENT[1]);*/
+    //fprintf( output, "%s#ifdef INSTR_FI// Fault Injection-Bit flip\n", INDENT[1]);
+    //fprintf( output, "%sac_fi<unsigned> fi;\n", INDENT[1]);
+    //fprintf( output, "%s#endif \n\n", INDENT[1]);
   
   }
+
+  TraceInstr(output);
 
   //!Closing class declaration.
   fprintf( output,"%s};\n", INDENT[0] );
@@ -3426,12 +3391,12 @@ void CreateMakefile(){
     fprintf( output, "OTHER  += -DINSTR_TRACE\n");
     fprintf( output, "endif\n");
 
-    fprintf( output, "ifdef INSTR_FI\n");
+    /*fprintf( output, "ifdef INSTR_FI\n");
     fprintf( output, "OTHER  += -DINSTR_FI\n");
     fprintf( output, "endif\n");
     fprintf( output, "ifdef PC_FI\n");
     fprintf( output, "OTHER  += -DPC_FI\n");
-    fprintf( output, "endif\n");
+    fprintf( output, "endif\n");*/
   }
 
   fprintf( output, "CFLAGS := $(DEBUG) $(OPT) $(OTHER) %s %s\n",
@@ -3754,7 +3719,7 @@ void EmitDecodification( FILE *output, int base_indent) {
 
     if(ACFaultInjection) {
       fprintf( output, "%s#ifdef INSTR_TRACE\n", INDENT[base_indent]);
-      fprintf( output, "%strace.trace_instr_format(ISA.instr_format_table[instr_dec->id]);\n", INDENT[base_indent]);
+      fprintf( output, "%strace_instr_format(ISA.instr_format_table[instr_dec->id]);\n", INDENT[base_indent]);
       fprintf( output, "%s#endif \n", INDENT[base_indent]);
     }
 
@@ -4316,8 +4281,8 @@ void EmitCacheDeclaration( FILE *output, ac_sto_list* pstorage, int base_indent)
 /*!  Emits a Decoder Cache Structure.
   \brief Used by CreateProcessorHeader function */
 /***************************************/
-void EmitDecCache(FILE *output, int base_indent, char *project_name) {
-  /*extern ac_dec_format *format_ins_list;
+void EmitDecCache(FILE *output, int base_indent) {
+  extern ac_dec_format *format_ins_list;
 
   ac_dec_format *pformat;
   ac_dec_field *pfield;
@@ -4351,71 +4316,7 @@ void EmitDecCache(FILE *output, int base_indent, char *project_name) {
             pformat->name, pformat->name);
   }
   fprintf(output, "%s};\n", INDENT[base_indent + 1]);
-  fprintf(output, "%s} DecCacheItem ;\n\n", INDENT[base_indent]);*/
-
-  extern ac_dec_format *format_ins_list;
-
-  ac_dec_format *pformat;
-  ac_dec_field *pfield;
-
-  int max_ins_list = 0;
-  int max_pfield = 0, num_pfield = 0;
-
-  for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next) {
-    for (pfield = pformat->fields; pfield != NULL; pfield = pfield->next) {
-      fprintf(output, "#define ");
-      fprintf(output, "%s%s_%s_sz %d\n", INDENT[base_indent], pformat->name, pfield->name, pfield->size);
-      ++num_pfield;
-    }
-    fprintf(output, "#define ");
-    fprintf(output, "%s_Num %d\n", pformat->name, num_pfield); 
-    fprintf(output, "\n");
-    if(max_pfield <= num_pfield) max_pfield = num_pfield;
-    num_pfield = 0;
-    ++max_ins_list;
-  }
-
-  fprintf(output, "#define ");
-  fprintf(output, "%sinstr_num %d\n", INDENT[base_indent], max_ins_list);
-  fprintf(output, "#define ");
-  fprintf(output, "%smax_reg_num %d\n", INDENT[base_indent], max_pfield);
-
-  fprintf(output, "\nnamespace %s_type {\n", project_name);
-
-  for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next) {
-    fprintf(output, "%stypedef struct {\n", INDENT[base_indent]);
-    for (pfield = pformat->fields; pfield != NULL; pfield = pfield->next) {
-      fprintf(output, "%s", INDENT[base_indent + 1]);
-      if (!pfield->sign) fprintf(output, "u");
-
-      // Force to be int32_t
-      /*if (pfield->size < 9) fprintf(output, "int8_t");
-      else if (pfield->size < 17) fprintf(output, "int16_t");
-      else if (pfield->size < 33) fprintf(output, "int32_t");
-      else fprintf(output, "int64_t");*/
-      fprintf(output, "int32_t");
-
-      fprintf(output, " %s;\n", pfield->name);
-    }
-    fprintf(output, "%s} T_%s;\n\n", INDENT[base_indent], pformat->name);
-  }
-
-  fprintf(output, "%stypedef struct {\n", INDENT[base_indent]);
-  if( !ACFullDecode )
-    fprintf(output, "%sbool valid;\n", INDENT[base_indent + 1]);
-  if (ACThreading)
-    fprintf(output, "%svoid* end_rot;\n", INDENT[base_indent + 1]);
-  fprintf(output, "%sunsigned id;\n", INDENT[base_indent + 1]);
-
-  fprintf(output, "%sunion {\n", INDENT[base_indent + 1]);
-  for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next) {
-    fprintf(output, "%sT_%s F_%s;\n", INDENT[base_indent + 2],
-            pformat->name, pformat->name);
-  }
-  fprintf(output, "%s};\n", INDENT[base_indent + 1]);
   fprintf(output, "%s} DecCacheItem ;\n\n", INDENT[base_indent]);
-
-  fprintf(output, "}\n");
 }
 
 
@@ -4459,11 +4360,11 @@ void EmitDecCacheAt(FILE *output, int base_indent) {
   // JT modified
   if(ACFaultInjection) {
     fprintf(output, "%s#ifdef INSTR_TRACE\n", INDENT[base_indent]);
-    fprintf(output, "%strace.trace_instr(instr_dec);\n", INDENT[base_indent]);
+    fprintf(output, "%strace_instr(instr_dec);\n", INDENT[base_indent]);
     fprintf(output, "%s#endif\n", INDENT[base_indent]);
-    fprintf(output, "%s#ifdef INSTR_FI\n", INDENT[base_indent]);
-    fprintf(output, "%sfi.select_fi(instr_dec);\n", INDENT[base_indent]);
-    fprintf(output, "%s#endif\n", INDENT[base_indent]);
+    //fprintf(output, "%s#ifdef INSTR_FI\n", INDENT[base_indent]);
+    //fprintf(output, "%sfi.select_fi(instr_dec);\n", INDENT[base_indent]);
+    //fprintf(output, "%s#endif\n", INDENT[base_indent]);
   }
 
 }
@@ -4980,4 +4881,93 @@ void GetFirstLevelDataDevice()
             exit(EXIT_FAILURE);
         }
     }
+}
+
+void TraceInstr(FILE *output) {
+    fprintf( output, "%sint instr_format_index;\n", INDENT[1]);
+    fprintf( output, "%sint instr_cnt;\n", INDENT[1]);
+
+    /**************************************************************
+    void trace_instr(DecCacheItem* instr_dec) {}
+    **************************************************************/
+    fprintf( output, "%svoid trace_instr(DecCacheItem* instr_dec) { \n", INDENT[1]);
+    fprintf( output, "%s++instr_cnt; \n\n", INDENT[2]);
+    fprintf( output, "%sswitch(instr_format_index) { \n", INDENT[2]);
+
+    extern ac_dec_format *format_ins_list;
+
+    ac_dec_format *pformat;
+    ac_dec_field *pfield;
+
+    int instr_format_index = 1;
+    int pfield_cnt = 0;
+
+    for (pformat = format_ins_list; pformat != NULL ; pformat = pformat->next, ++instr_format_index) {
+      fprintf(output, "%scase %d: {\n", INDENT[3], instr_format_index);
+ 
+      /********************
+      Count the pfield size
+      ********************/
+      int pfield_size;
+      for (pfield = pformat->fields, pfield_size = 0; pfield != NULL; pfield = pfield->next, ++pfield_size) {}
+
+      /********************************
+      Print the Register type name info
+      ********************************/
+      for (pfield = pformat->fields, pfield_cnt = 0; pfield != NULL; pfield = pfield->next, ++pfield_cnt) {
+        if(pfield_cnt == 0) {
+          fprintf(output, "%scerr << \"Instr\" << instr_cnt << \": \" << \"%s\" << endl;\n", INDENT[4], pformat->name);
+          fprintf(output, "%scerr << \"%s: \" << static_cast<int>(instr_dec->F_%s.%s) << setw(1);\n", INDENT[4], pfield->name, pformat->name, pfield->name);
+        } else if(pfield_cnt != 0 && pfield_cnt != pfield_size-1) 
+          fprintf(output, "%scerr << \", %s: \" << static_cast<int>(instr_dec->F_%s.%s) << setw(1);\n", INDENT[4], pfield->name, pformat->name, pfield->name);
+        else 
+          fprintf(output, "%scerr << endl;\n\n", INDENT[4]);
+      }
+
+      /*****************************
+      Declare the Register type info
+      *****************************/
+      for (pfield = pformat->fields, pfield_cnt = 0; pfield != NULL; pfield = pfield->next, ++pfield_cnt) {
+        if(pfield_cnt != pfield_size-1) 
+          fprintf(output, "%sbitset<%d> %s_%s(instr_dec->F_%s.%s);\n", INDENT[4], pfield->size, pformat->name, pfield->name, pformat->name, pfield->name);
+        else
+          fprintf(output, "%sbitset<%d> %s_%s(instr_dec->F_%s.%s);\n\n", INDENT[4], pfield->size, pformat->name, pfield->name, pformat->name, pfield->name);
+      } 
+
+      /*****************************
+      Print the Register type name info
+      *****************************/
+      for (pfield = pformat->fields, pfield_cnt = 0; pfield != NULL; pfield = pfield->next, ++pfield_cnt) {
+        if(pfield_cnt != pfield_size-1) {
+          fprintf(output, "%scerr << \"%s\" << setw(10); \n", INDENT[4], pfield->name);
+        } else 
+          fprintf(output, "%scerr << \"%s\" << endl; \n\n", INDENT[4], pfield->name);
+      }
+
+      /*****************************
+      Print the Register type name info
+      *****************************/
+      for (pfield = pformat->fields, pfield_cnt = 0; pfield != NULL; pfield = pfield->next, ++pfield_cnt) {
+        if(pfield_cnt != pfield_size-1) {
+          fprintf(output, "%scerr << (%s_%s) << setw(10); \n", INDENT[4], pformat->name, pfield->name);
+        } else 
+          fprintf(output, "%scerr << (%s_%s) << endl; \n", INDENT[4], pformat->name, pfield->name);
+      }
+
+      fprintf(output, "%sbreak;\n\n", INDENT[4]);
+      fprintf(output, "%s}\n\n", INDENT[3]);
+    }   
+    fprintf( output, "%s}\n", INDENT[2]);
+
+    fprintf( output, "%s}\n", INDENT[1]);
+
+	/**************************************************************
+	void trace_instr_format(int instr_foramt) {}
+	**************************************************************/
+    fprintf( output, "%svoid trace_instr_format(int instr_format) { \n", INDENT[1]);
+    fprintf( output, "%s#ifdef INSTR_TRACE\n", INDENT[2]);
+    fprintf( output, "%s//cerr << instr_format << endl;\n", INDENT[2]);
+    fprintf( output, "%s#endif\n", INDENT[2]);
+    fprintf( output, "%sinstr_format_index = instr_format;\n", INDENT[2]);
+    fprintf( output, "%s}\n", INDENT[1]);
 }
